@@ -1,3 +1,7 @@
+#include <avr/io.h>
+#include <avr/interrupt.h>
+#include <util/delay.h>
+#include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <DS3231.h>
 
@@ -15,6 +19,7 @@ volatile bool change_interval = false;
 
 int portions_crt = 1;
 int interval = 1;
+bool feed_active = false;
 
 int next_feed_hour = 19;
 int next_feed_minute = 24;
@@ -27,10 +32,9 @@ void setup_gpio() {
 
 void setup_pwm_servo() {
   DDRB |= (1 << SERVO_PIN); 
-
   TCCR1A = (1 << COM1A1) | (1 << WGM11);              // Fast PWM
   TCCR1B = (1 << WGM13) | (1 << WGM12) | (1 << CS11);  // Prescaler 8
-  ICR1 = 39999; // 20ms (50Hz) PWM
+  ICR1 = 39999; 
 }
 
 void set_servo_angle(int angle) {
@@ -43,7 +47,6 @@ void setup_interrupts() {
   EIMSK |= (1 << INT0) | (1 << INT1);  
   sei();                                
 }
-
 
 void update_lcd() {
   lcd.setCursor(0, 0);
@@ -107,14 +110,26 @@ void loop() {
   if (change_interval) {
     interval++;
     if (interval > 23) interval = 1;
-    next_feed_hour = (t.hour + interval) % 24; 
+    next_feed_hour = (t.hour + interval) % 24;
     change_interval = false;
     lcd.clear();
   }
 
   if (!(PIND & (1 << BTN_MANUAL))) {
-    _delay_ms(300);
+    feed_active = true;
+    _delay_ms(300); 
+  }
+
+  if (t.hour == next_feed_hour &&
+      t.min == next_feed_minute &&
+      t.sec == next_feed_seconds) {
+    feed_active = true;
+    next_feed_hour = (t.hour + interval) % 24; 
+  }
+
+  if (feed_active) {
     feed_now();
+    feed_active = false;
   }
 
   update_lcd();
