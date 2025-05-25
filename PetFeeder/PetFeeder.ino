@@ -10,6 +10,9 @@ Time t;
 #define BTN_MANUAL PD5  
 #define SERVO_PIN  PB1  // OC1A = pin 9
 
+volatile bool change_portions = false;
+volatile bool change_interval = false;
+
 int portions_crt = 1;
 int interval = 1;
 
@@ -35,6 +38,13 @@ void set_servo_angle(int angle) {
   OCR1A = pulse_us * 2; 
 }
 
+void setup_interrupts() {
+  EICRA |= (1 << ISC01) | (1 << ISC11); 
+  EIMSK |= (1 << INT0) | (1 << INT1);  
+  sei();                                
+}
+
+
 void update_lcd() {
   lcd.setCursor(0, 0);
   lcd.print("Interval: ");
@@ -49,6 +59,7 @@ void setup() {
   lcd.backlight();
   setup_gpio();
   setup_pwm_servo();
+  setup_interrupts();
   rtc.begin();
   Serial.begin(9600);
 
@@ -69,7 +80,6 @@ void feed_now() {
   lcd.clear();
 }
 
-
 void loop() {
   t = rtc.getTime();
 
@@ -87,11 +97,35 @@ void loop() {
   Serial.print(":");
   Serial.println(next_feed_seconds);
 
+  if (change_portions) {
+    portions_crt++;
+    if (portions_crt > 10) portions_crt = 1;
+    change_portions = false;
+    lcd.clear();
+  }
+
+  if (change_interval) {
+    interval++;
+    if (interval > 23) interval = 1;
+    next_feed_hour = (t.hour + interval) % 24; 
+    change_interval = false;
+    lcd.clear();
+  }
+
   if (!(PIND & (1 << BTN_MANUAL))) {
-    _delay_ms(300); 
+    _delay_ms(300);
     feed_now();
   }
 
   update_lcd();
-  _delay_ms(250); 
+  _delay_ms(250);
 }
+
+ISR(INT0_vect) {
+  change_portions = true;
+}
+
+ISR(INT1_vect) {
+  change_interval = true;
+}
+
