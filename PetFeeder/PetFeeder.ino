@@ -54,6 +54,22 @@ void setup() {
 
 }
 
+void feed_now() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("FEEDING");
+
+  for (int i = 0; i < portions_crt; i++) {
+    set_servo_angle(180);
+    _delay_ms(2000);
+    set_servo_angle(0);
+    _delay_ms(1000);
+  }
+
+  lcd.clear();
+}
+
+
 void loop() {
   t = rtc.getTime();
 
@@ -70,5 +86,12 @@ void loop() {
   Serial.print(next_feed_minute);
   Serial.print(":");
   Serial.println(next_feed_seconds);
-}
 
+  if (!(PIND & (1 << BTN_MANUAL))) {
+    _delay_ms(300); 
+    feed_now();
+  }
+
+  update_lcd();
+  _delay_ms(250); 
+}
